@@ -55,7 +55,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 );
               },
             ),
-            GlowingButton(),
+            GlowingButton(MediaQuery.of(context).size),
           ],
         ),
       ),
