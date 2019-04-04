@@ -1,5 +1,6 @@
 import 'package:bloc_streams/CounterBloc.dart';
 import 'package:bloc_streams/CounterEvent.dart';
+import 'package:bloc_streams/GlowingButton.dart';
 import 'package:flutter/material.dart';
 
 // example from https://medium.com/flutter-community/flutter-bloc-with-streams-6ed8d0a63bb8
@@ -37,26 +38,26 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: StreamBuilder(
-        stream: _bloc.streamCounter,
-        initialData: 0,
-        builder: (context, snapshot) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(
-                  'You have pushed the button this many times:',
-                ),
-                Text(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Text(
+              'You have pushed the button this many times:',
+            ),
+            StreamBuilder(
+              stream: _bloc.streamCounter,
+              initialData: 0,
+              builder: (context, snapshot) {
+                return Text(
                   snapshot.data.toString(),
                   style: Theme.of(context).textTheme.display1,
-                ),
-              ],
+                );
+              },
             ),
-          );
-//
-        },
+            GlowingButton(),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _bloc.counterEventSink.add(IncrementEvent()),
