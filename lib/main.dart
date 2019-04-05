@@ -14,6 +14,8 @@ class MyApp extends StatelessWidget {
       title: 'Flutter Demo',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        backgroundColor: Colors.indigo[800],
+//        primaryTextTheme:
       ),
       home: MyHomePage(title: 'Flutter Demo Home Page'),
     );
@@ -38,31 +40,13 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
+      backgroundColor: Theme.of(context).backgroundColor,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            StreamBuilder(
-              stream: _bloc.streamCounter,
-              initialData: 0,
-              builder: (context, snapshot) {
-                return Text(
-                  snapshot.data.toString(),
-                  style: Theme.of(context).textTheme.display1,
-                );
-              },
-            ),
-            GlowingButton(MediaQuery.of(context).size),
-          ],
+        child: GlowingButton(
+          MediaQuery.of(context).size,
+//          Text("What"),
+          FlutterLogo(),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _bloc.counterEventSink.add(IncrementEvent()),
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
       ),
     );
   }

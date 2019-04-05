@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 
 class GlowingButton extends StatefulWidget {
-  Size _size;
+  final Size _size;
+  final Widget _child;
 
-  GlowingButton(this._size);
+  GlowingButton(this._size, this._child);
 
   @override
   State<StatefulWidget> createState() => _GlowingButtonState();
@@ -20,19 +21,21 @@ class _GlowingButtonState extends State<GlowingButton>
   List<Dot> listDot;
   AnimationController animationController;
 
-  var _updatedPosition = Offset(50, 50);
-  var _updatedSize = Offset(100, 50);
+  var _updatedPosition = Offset(0, 0);
+  var _updatedSize = Offset(150, 50);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(0),
-      color: Colors.black.withOpacity(0.6),
+//      color: Colors.blue, // for debugging
+      padding:
+          EdgeInsets.all(10), // this should cover the blur around the edges
       child: GestureDetector(
         child: AnimatedBuilder(
           animation: new CurvedAnimation(
               parent: animationController, curve: Curves.easeInOut),
           builder: _animatedBuilder,
+          child: widget._child,
         ),
         onTap: () {
           setState(() {
@@ -58,19 +61,18 @@ class _GlowingButtonState extends State<GlowingButton>
   }
 
   void _init() {
-    var dotCount = 10;
-
-    var random = Random();
+    var random = Random.secure();
     listDot = [];
 
-    double dx = _updatedSize.dx / dotCount.ceilToDouble();
-    double dy = _updatedSize.dy / dotCount.ceilToDouble();
+    double dx = _updatedSize.dx / 10.ceilToDouble();
+    double dy = _updatedSize.dy / 4.ceilToDouble();
 
+    // TODO check if the offset falls withing the rounded rectangle
     for (double x = _updatedPosition.dx;
-        x < _updatedPosition.dx + _updatedSize.dx;
+        x <= _updatedPosition.dx + _updatedSize.dx;
         x += dx) {
       for (double y = _updatedPosition.dy;
-          y < _updatedPosition.dy + _updatedSize.dy;
+          y <= _updatedPosition.dy + _updatedSize.dy;
           y += dy) {
         var offset = Offset(x, y);
         var speed =
@@ -81,7 +83,7 @@ class _GlowingButtonState extends State<GlowingButton>
 
     animationController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 30),
+      duration: Duration(seconds: 3),
     )..addListener(() {
         for (var node in listDot) {
           node.move(animationController.value);
@@ -96,10 +98,17 @@ class _GlowingButtonState extends State<GlowingButton>
   }
 
   Widget _animatedBuilder(BuildContext context, Widget child) {
-    return CustomPaint(
-      size: Size(200, 200),
-      painter:
-          _SparksPainter(_wasTapped, listDot, _updatedPosition, _updatedSize),
+    return Stack(
+      children: [
+        Center(
+          child: CustomPaint(
+            size: Size(_updatedSize.dx, _updatedSize.dy),
+            painter: _SparksPainter(
+                _wasTapped, listDot, _updatedPosition, _updatedSize),
+          ),
+        ),
+        Center(child: child),
+      ],
     );
   }
 }
@@ -123,41 +132,43 @@ class _SparksPainter extends CustomPainter {
 
   @override
   void paint(ui.Canvas canvas, ui.Size size) {
-    Paint paint = Paint();
-    paint.color = Colors.yellow[100];
+    Paint paintDotsSolid = Paint();
+    paintDotsSolid.color = Colors.yellow;
+
     double sigma = 10.0;
+    Paint paintDotsFuzzy = Paint();
+    paintDotsFuzzy.color = paintDotsSolid.color;
+    paintDotsFuzzy.maskFilter = MaskFilter.blur(BlurStyle.normal, sigma);
 
-    paint.maskFilter = MaskFilter.blur(BlurStyle.outer, sigma);
-
-    for (var dot in _listDot) {
-      dot.draw(canvas, paint);
-    }
+    Paint paintEdge = Paint();
+    paintEdge.color = paintDotsSolid.color;
+    paintEdge.maskFilter = MaskFilter.blur(BlurStyle.outer, sigma);
 
     // draw rect with primitive
-
     Rect rect =
         Rect.fromPoints(_updatedPosition, _updatedPosition + _updatedSize);
-
     RRect rrect = RRect.fromRectAndRadius(rect, Radius.circular(10));
 
-    canvas.drawRRect(rrect, paint);
-
+    // paint inner part of button
     var paintSolid = Paint();
-    paintSolid.color = Colors.lightBlue[100];
-    paintSolid.style = PaintingStyle.stroke;
-    paintSolid.strokeWidth = 2;
+    paintSolid.color = Colors.lightBlue[200];
     canvas.drawRRect(rrect, paintSolid);
 
+    // paint edges
+    var paintStroke = Paint();
+    paintStroke.color = Colors.yellow[50];
+    paintStroke.style = PaintingStyle.stroke;
+    paintStroke.strokeWidth = 2;
+    canvas.drawRRect(rrect, paintStroke);
+
+    // paint edge blur
     double sz = 1;
-    Paint paintPixels = Paint();
+    canvas.drawRRect(rrect, paintEdge);
 
-    paintPixels.maskFilter = MaskFilter.blur(BlurStyle.normal, 1);
-
+    // paint exploding dots (optimize and add a state where we can skip this)
     var r = Random(1);
-
-    for (Offset offset in _offsets) {
-      paintPixels.color = Colors.yellow.withOpacity(r.nextDouble());
-      canvas.drawCircle(offset + Offset(sz, sz), sz * 2, paintPixels);
+    for (var dot in _listDot) {
+      dot.draw(canvas, paintDotsFuzzy, paintDotsSolid);
     }
   }
 }
@@ -172,6 +183,40 @@ class Dot {
   Dot(this._initialPosition, this._initialSpeed);
 
   void move(double dt) {
+    double offsetDt = 0.05;
+
+    if (dt < offsetDt) {
+      // function parameter will go from 0 to 1
+      updateByVibration(dt / offsetDt);
+    } else {
+      updateByExplosion(dt - offsetDt);
+    }
+  }
+
+  void draw(Canvas canvas, Paint paintFuzzy, Paint paintSolid) {
+    var sizeSolid = 4.0 * _brightness;
+
+    var sizeFuzzy = sizeSolid * 3.0;
+
+    Offset center = Offset(_updatedPosition.dx, _updatedPosition.dy);
+    Offset offFuzzy = Offset(sizeFuzzy / 2, sizeFuzzy / 2);
+    Rect rectFuzzy = Rect.fromPoints(center - offFuzzy, center + offFuzzy);
+
+    Offset offSolid = Offset(sizeSolid / 2, sizeSolid / 2);
+    Rect rectSolid = Rect.fromPoints(center - offSolid, center + offSolid);
+
+    canvas.drawOval(rectSolid, paintSolid);
+    canvas.drawOval(rectFuzzy, paintFuzzy);
+  }
+
+  void updateByVibration(double dt) {
+//    _brightness = Curves.bounceIn.transform(dt);
+    _brightness = Curves.elasticInOut.transform(dt);
+    _brightness = Curves.easeOutBack.transform(dt);
+    _updatedPosition = _initialPosition;
+  }
+
+  void updateByExplosion(double dt) {
     double curveFactor = Curves.decelerate.transform(dt);
 
     double a = 0.9;
@@ -183,31 +228,5 @@ class Dot {
     Offset translation = _initialSpeed * curveFactor * 400.0;
 
     _updatedPosition = _initialPosition + translation;
-  }
-
-  void draw(Canvas canvas, Paint paint) {
-//    double size = 3.9;
-
-    var sizeSolid = 4.0 * _brightness;
-
-    var sizeFuzzy = sizeSolid * 3.0;
-
-    double sigma = 4.0;
-
-    Paint paint = Paint();
-
-    Offset center = Offset(_updatedPosition.dx, _updatedPosition.dy);
-    Offset offFuzzy = Offset(sizeFuzzy / 2, sizeFuzzy / 2);
-    Rect rectFuzzy = Rect.fromPoints(center - offFuzzy, center + offFuzzy);
-
-    paint.color = Colors.yellow;
-
-    paint.maskFilter = MaskFilter.blur(BlurStyle.normal, sigma);
-    canvas.drawOval(rectFuzzy, paint);
-
-    paint.maskFilter = null;
-    Offset offSolid = Offset(sizeSolid / 2, sizeSolid / 2);
-    Rect rectSolid = Rect.fromPoints(center - offSolid, center + offSolid);
-    canvas.drawOval(rectSolid, paint);
   }
 }
